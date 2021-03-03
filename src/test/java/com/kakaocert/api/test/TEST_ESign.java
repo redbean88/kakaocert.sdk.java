@@ -1,5 +1,8 @@
 package com.kakaocert.api.test;
 
+import static org.junit.Assert.assertNotNull;
+
+import org.junit.Before;
 import org.junit.Test;
 
 import com.kakaocert.api.KakaocertException;
@@ -9,40 +12,57 @@ import com.kakaocert.api.ResponseESign;
 import com.kakaocert.api.VerifyResult;
 import com.kakaocert.api.esign.RequestESign;
 import com.kakaocert.api.esign.ResultESign;
+import com.kakaocert.api.test.config.TestConfig;
+import com.kakaocert.api.test.config.TestUserInfo;
 
 public class TEST_ESign {
 
-	private final String testLinkID = "TESTER";
-	private final String testSecretKey = "SwWxqU+0TErBXy/9TVjIPEnI0VTUMMSQZtJf3Ed8q3I=";
-	
 	private KakaocertService kakaocertService;
 	
-	public TEST_ESign() {
+	@Before
+	public void setup() {
 		KakaocertServiceImp service = new KakaocertServiceImp();
-		service.setLinkID(testLinkID);
-		service.setSecretKey(testSecretKey);
+		service.setLinkID(TestConfig.testLinkID);
+		service.setSecretKey(TestConfig.testSecretKey);
 		service.setUseStaticIP(false);
 		
 		kakaocertService = service;
-		
 	}
+	
+	/**
+	 * 서비스 null 체크
+	 */
+	@Test
+	public void Test_serverNullCheck() {
+		assertNotNull("서비스 널 체크", kakaocertService);
+	}
+	
 	
 	@Test
 	public void requestESign_TEST() throws KakaocertException{
 		try {
 			RequestESign request = new RequestESign();
-			request.setAllowSimpleRegistYN(true);
-			request.setVerifyNameYN(true);
+			
+			//기본정보
 			request.setCallCenterNum("1600-9999");
 			request.setExpires_in(60);
-			request.setPayLoad(null);
-			request.setReceiverBirthDay("19900108");
-			request.setReceiverHP("01043245117");
-			request.setReceiverName("정요한");
-			request.setTMSMessage(null);
-			request.setSubClientID("");
-			request.setTMSTitle("TMS Title");
 			request.setToken("token value");
+			
+			//수신자정보
+			request.setReceiverBirthDay(TestUserInfo.birth);
+			request.setReceiverHP(TestUserInfo.tel);
+			request.setReceiverName(TestUserInfo.name);
+				
+			//부가정보
+			request.setTMSMessage("인증 테스트입니다.");
+			request.setTMSTitle("인증 테스트");
+			request.setSubClientID("");	//별칭 코드
+			
+			request.setVerifyNameYN(true);	//실명확인여부
+			
+			request.setPayLoad(null);
+			
+			request.setAllowSimpleRegistYN(true);
 			
 			ResponseESign response = kakaocertService.requestESign("020040000001", request, false);
 			System.out.println(response.getReceiptId());
@@ -57,11 +77,11 @@ public class TEST_ESign {
 	@Test
 	public void getESignResult_TEST() throws KakaocertException {
 		try {
-			ResultESign result = kakaocertService.getESignState("020040000001", "020090815353800001");
+			ResultESign result = kakaocertService.getESignState("020040000001", "021030312114400001");
 			
 			System.out.println(result.getCallCenterNum());
 			System.out.println(result.getReceiptID());
-			System.out.println(result.getRegDT());
+			System.out.println(result.getRegDT());	//2
 			System.out.println(result.getState());
 			System.out.println(result.getExpires_in());
 			System.out.println(result.isAllowSimpleRegistYN());
@@ -110,9 +130,9 @@ public class TEST_ESign {
 			request.setCallCenterNum("1600-9999");
 			request.setExpires_in(1);
 			request.setPayLoad(null);
-			request.setReceiverBirthDay("19900108");
-			request.setReceiverHP("01043245117");
-			request.setReceiverName("정요한");
+			request.setReceiverBirthDay(TestUserInfo.birth);
+			request.setReceiverHP(TestUserInfo.tel);
+			request.setReceiverName(TestUserInfo.name);
 			request.setTMSMessage(null);
 			request.setSubClientID("");
 			request.setTMSTitle("TMS Title");

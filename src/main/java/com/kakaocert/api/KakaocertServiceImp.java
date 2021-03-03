@@ -611,7 +611,7 @@ public class KakaocertServiceImp implements KakaocertService{
 		esignRequest.setAppUseYN(appUseYN);
 		
 		String PostData = toJsonString(esignRequest);
-		
+		System.out.println(PostData);
 		ResponseESign response = httppost("/SignToken/Request", ClientCode, PostData, null, ResponseESign.class);
 		
 		return response;

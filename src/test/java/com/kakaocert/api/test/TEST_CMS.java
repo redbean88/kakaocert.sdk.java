@@ -1,5 +1,8 @@
 package com.kakaocert.api.test;
 
+import static org.junit.Assert.assertNotNull;
+
+import org.junit.Before;
 import org.junit.Test;
 
 import com.kakaocert.api.KakaocertException;
@@ -8,21 +11,29 @@ import com.kakaocert.api.KakaocertServiceImp;
 import com.kakaocert.api.VerifyResult;
 import com.kakaocert.api.cms.RequestCMS;
 import com.kakaocert.api.cms.ResultCMS;
+import com.kakaocert.api.test.config.TestConfig;
+import com.kakaocert.api.test.config.TestUserInfo;
 
 public class TEST_CMS {
-	private final String testLinkID = "TESTER";
-	private final String testSecretKey = "SwWxqU+0TErBXy/9TVjIPEnI0VTUMMSQZtJf3Ed8q3I=";
 	
 	private KakaocertService kakaocertService;
 	
-	public TEST_CMS() {
+	@Before
+	public void setup() {
 		KakaocertServiceImp service = new KakaocertServiceImp();
-		service.setLinkID(testLinkID);
-		service.setSecretKey(testSecretKey);
+		service.setLinkID(TestConfig.testLinkID);
+		service.setSecretKey(TestConfig.testSecretKey);
 		service.setUseStaticIP(false);
 		
 		kakaocertService = service;
-		
+	}
+	
+	/**
+	 * 서비스 null 체크
+	 */
+	@Test
+	public void Test_serverNullCheck() {
+		assertNotNull("서비스 널 체크", kakaocertService);
 	}
 	
 	@Test
@@ -34,9 +45,9 @@ public class TEST_CMS {
 			request.setCallCenterNum("1600-9999");
 			request.setExpires_in(60);
 			request.setPayLoad(null);
-			request.setReceiverBirthDay("19900108");
-			request.setReceiverHP("01043245117");
-			request.setReceiverName("정요한");
+			request.setReceiverBirthDay(TestUserInfo.birth);
+			request.setReceiverHP(TestUserInfo.tel);
+			request.setReceiverName(TestUserInfo.name);
 			request.setTMSMessage(null);
 			request.setSubClientID("020040000004");
 			request.setTMSTitle("메시지명칭");
