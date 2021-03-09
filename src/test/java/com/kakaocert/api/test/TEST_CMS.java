@@ -3,7 +3,9 @@ package com.kakaocert.api.test;
 import static org.junit.Assert.assertNotNull;
 
 import org.junit.Before;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
+import org.junit.runners.MethodSorters;
 
 import com.kakaocert.api.KakaocertException;
 import com.kakaocert.api.KakaocertService;
@@ -13,10 +15,16 @@ import com.kakaocert.api.cms.RequestCMS;
 import com.kakaocert.api.cms.ResultCMS;
 import com.kakaocert.api.test.config.TestConfig;
 import com.kakaocert.api.test.config.TestUserInfo;
+import com.kakaocert.api.test.util.PrettyPrint;
+import com.kakaocert.api.test.util.decodeBase64Url;
 
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TEST_CMS {
 	
 	private KakaocertService kakaocertService;
+	
+	private static String receiptID = "";
+	
 	
 	@Before
 	public void setup() {
@@ -32,34 +40,43 @@ public class TEST_CMS {
 	 * 서비스 null 체크
 	 */
 	@Test
-	public void Test_serverNullCheck() {
+	public void test0_serverNullCheck() {
 		assertNotNull("서비스 널 체크", kakaocertService);
+		PrettyPrint.setTitleNValue("서비스가 정상적으로 생성되었습니다.", "1231");
+		PrettyPrint.print();
 	}
 	
 	@Test
-	public void request_TEST() throws KakaocertException{
+	public void test1_request() throws KakaocertException{
 		try {
 			RequestCMS request = new RequestCMS();
-			request.setAllowSimpleRegistYN(false);
-			request.setVerifyNameYN(false);
 			request.setCallCenterNum("1600-9999");
 			request.setExpires_in(60);
-			request.setPayLoad(null);
 			request.setReceiverBirthDay(TestUserInfo.birth);
 			request.setReceiverHP(TestUserInfo.tel);
 			request.setReceiverName(TestUserInfo.name);
-			request.setTMSMessage(null);
-			request.setSubClientID("020040000004");
+			
+			request.setBankAccountName("예금주명");
+			request.setBankAccountNum("계좌번호");
+			
+			request.setBankCode("004"); //참여기관 코드
+			
+			request.setClientUserID("식별코드"); //이용기관에서 부여한 식별코드
+			
+			request.setSubClientID(TestConfig.SubClientID);	//별칭코드
+			
 			request.setTMSTitle("메시지명칭");
+			request.setTMSMessage("메시지 내용");
 			
-			request.setBankAccountName(null);
-			request.setBankAccountNum("9-4324-5117-58");
-			request.setBankCode("004");
-			request.setClientUserID("123");
+			request.setAllowSimpleRegistYN(false);
+			request.setVerifyNameYN(false);
 			
+			request.setPayLoad("메모용 데이터 입니다.");
 			
-			String receiptID = kakaocertService.requestCMS("020040000001", request);
-			System.out.println(receiptID);
+			receiptID = kakaocertService.requestCMS(TestConfig.ClientCode, request);
+			PrettyPrint.setTitleNValue("승인신청시작", "!");
+			PrettyPrint.setTitleNValue("접수아이디", receiptID);
+			PrettyPrint.print();
 			
 		} catch(KakaocertException ke) {
 			System.out.println(ke.getCode());
@@ -68,49 +85,80 @@ public class TEST_CMS {
 	}
 	
 	@Test
-	public void getResult_TEST() throws KakaocertException {
+	public void test2_getResult() throws KakaocertException {
 		try {
-			ResultCMS result = kakaocertService.getCMSState("020040000001", "020090815341800001");
-			
-			System.out.println(result.getCallCenterNum());
-			System.out.println(result.getReceiptID());
-			System.out.println(result.getRegDT());
-			System.out.println(result.getState());
-			System.out.println(result.getExpires_in());
-			System.out.println(result.isAllowSimpleRegistYN());
-			System.out.println(result.isVerifyNameYN());
-			System.out.println(result.getPayload());
-			System.out.println(result.getRequestDT());
-			System.out.println(result.getExpireDT());
-			System.out.println(result.getClientCode());
-			System.out.println(result.getClientName());
-			System.out.println(result.getTmstitle());
-			System.out.println(result.getTmsmessage());
-			
-			System.out.println(result.getSubClientCode());
-			System.out.println(result.getSubClientName());
-			System.out.println(result.getRequestDT());
-			System.out.println(result.getViewDT());
-			System.out.println(result.getCompleteDT());
-			System.out.println(result.getVerifyDT());
-			
+
+			int veryfiedFlag = 0;
+			while(true) {
+				ResultCMS result = kakaocertService.getCMSState(TestConfig.ClientCode, receiptID);
+				
+				if(result.getState() == 0) {
+					if(veryfiedFlag == 0) {
+						PrettyPrint.setTitleNValue("인증이 완료되지 않았습니다.", "!");
+						prettyPrint(result);
+						veryfiedFlag++;
+					}
+				}else if(result.getState() == 1) {
+					PrettyPrint.setTitleNValue("정상처리되었습니다.", "!");
+					prettyPrint(result);
+					break;
+				}else {
+					PrettyPrint.setTitleNValue("만료되었습니다.", "!");
+					prettyPrint(result);
+					break;
+				}
+				try {
+					Thread.sleep(3000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 		} catch (KakaocertException ke) {
 			System.out.println(ke.getCode());
 			System.out.println(ke.getMessage());
 		}
 	}
 	
+	
+
 	@Test
-	public void verifyCMS_TEST() throws KakaocertException {
+	public void test3_verifyCMS() throws KakaocertException {
 		try {
-			VerifyResult result = kakaocertService.verifyCMS("020040000001", "020090815341800001");
+			VerifyResult result = kakaocertService.verifyCMS(TestConfig.ClientCode, receiptID);
 			
-			System.out.println(result.getReceiptId());
-			System.out.println(result.getSignedData());
-			
+			PrettyPrint.setTitleNValue("접수아이디",result.getReceiptId());
+			PrettyPrint.setTitleNValue("전자서명데이터전문",result.getSignedData());
+			PrettyPrint.setTitleNValue("전자서명데이터원문",decodeBase64Url.run(result.getSignedData()));
+			PrettyPrint.print();
+						
 		} catch (KakaocertException ke) {
 			System.out.println(ke.getCode());
 			System.out.println(ke.getMessage());
 		}
 	}
+	
+	private void prettyPrint(ResultCMS result) {
+		
+		PrettyPrint.setTitleNValue("접수아이디",result.getReceiptID());
+		PrettyPrint.setTitleNValue("이용기관코드",result.getClientCode());
+		PrettyPrint.setTitleNValue("이용기관명",result.getClientName());
+		PrettyPrint.setTitleNValue("별칭",result.getSubClientName());
+		PrettyPrint.setTitleNValue("별칭코드",result.getSubClientCode());
+		PrettyPrint.setTitleNValue("상태",String.valueOf(result.getState()));
+		PrettyPrint.setTitleNValue("인증요청만료시간",String.valueOf(result.getExpires_in()));
+		PrettyPrint.setTitleNValue("고객센터전화번호",result.getCallCenterNum());
+		PrettyPrint.setTitleNValue("인증 메세지 제목",result.getTmstitle());
+		PrettyPrint.setTitleNValue("인증요청 메세지 부가내용",result.getTmsmessage());
+		PrettyPrint.setTitleNValue("인증서 발급유형 선택",String.valueOf(result.isAllowSimpleRegistYN()));
+		PrettyPrint.setTitleNValue("수신자 실명확인 여부",String.valueOf(result.isVerifyNameYN()));
+		PrettyPrint.setTitleNValue("카카오 인증서버 등록일시",result.getRequestDT());
+		PrettyPrint.setTitleNValue("인증 만료일시",result.getExpireDT());
+		PrettyPrint.setTitleNValue("인증요청 등록일시",result.getRegDT());
+		PrettyPrint.setTitleNValue("수신자 카카오톡 인증메시지 확인일시",result.getViewDT());
+		PrettyPrint.setTitleNValue("수신자 카카오톡 전자서명 완료일시",result.getCompleteDT());
+		PrettyPrint.setTitleNValue("서명 검증일시",result.getVerifyDT());
+		PrettyPrint.setTitleNValue("메모",result.getPayload());
+		PrettyPrint.print();
+	}
+
 }

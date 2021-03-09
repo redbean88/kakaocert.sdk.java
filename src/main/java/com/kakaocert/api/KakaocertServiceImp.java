@@ -111,6 +111,16 @@ public class KakaocertServiceImp implements KakaocertService{
 		this._secretKey = secretKey;
 	}
 	
+	/**
+	 * 토큰을 가져온다
+	 * 1. 기존 토큰이 없을 경우, 링크아이디, 비밀키, 서비스아이디, 스코프를 정하여 생성(빌터)
+	 * 2. ServiceURL을 설정.
+	 * 		1. KakaoCert 서비스 생성시 설정한 AuthURL이 있는 경우, AuthURL을 ServiceURL로 사용
+	 * 		2. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 Ture인 경우, Auth_GA_URL을 ServiceURL로 사용
+	 * @see	3. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 False인 경우(기본값), ServiceURL을 설정안함
+	 * @see	4. 스코프 값을 추가(310,320,330) 
+	 * @return tokenBuilder
+	 */
 	private TokenBuilder getTokenbuilder() {
 		if (this.tokenBuilder == null) {
 			tokenBuilder = TokenBuilder
@@ -127,14 +137,30 @@ public class KakaocertServiceImp implements KakaocertService{
 				}
 			}
 			
-			tokenBuilder.addScope("310");
-			tokenBuilder.addScope("320");
-			tokenBuilder.addScope("330");
+			tokenBuilder.addScope("310");	
+			tokenBuilder.addScope("320");	
+			tokenBuilder.addScope("330");	
 		}
 
 		return tokenBuilder;
 	}
 	
+	/**
+	 * 세션으로 관리하는 토큰을 가져온다.
+	 * 
+	 * 1. 이용기관 코드(clinentCode)를 확인후 없으면, Exception을 전달 
+	 * 2. tokenTable에 해당 이용기관의 token이 존재시, token에 할당
+	 * 3. token이 존재하면, token 만료기한과 API서버 시간(UTCTime)을 비교하여, API서버 시간(UTCTime)이 만료기한보다 이전이면 true, 아니면 false를 반환
+	 * 4. token이 만료되었다면, tokenTable에 해당 이용기관의 token이 존재시, 해당 이용기관의 token을 제거
+	 * 	1. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 True일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 할당하여 토큰을 생성
+	 * 	2. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 False일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 와일드카드(*)로 할당하여 토큰을 생성
+	 * 	3. 생성된 토큰을 tokenTable에 삽입
+	 * 
+	 * @param ClientCode
+	 * @param ForwardIP
+	 * @return token.session_token
+	 * @throws KakaocertException
+	 */
 	private String getSessionToken(String ClientCode, String ForwardIP)
 			throws KakaocertException {
 
@@ -144,26 +170,24 @@ public class KakaocertServiceImp implements KakaocertService{
 		Token token = null;
 		Date UTCTime = null;
 
+		//토큰 재사용
 		if (tokenTable.containsKey(ClientCode))
 			token = tokenTable.get(ClientCode);
 
+		//만료 여부 확인값
 		boolean expired = true;
 		
 		if (token != null) {
 			
-			SimpleDateFormat format = new SimpleDateFormat(
-					"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 			format.setTimeZone(TimeZone.getTimeZone("UTC"));
-			
-			SimpleDateFormat subFormat = new SimpleDateFormat(
-					"yyyy-MM-dd'T'HH:mm:ss'Z'");
+			SimpleDateFormat subFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 			subFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 			
 			try {
-				
-				Date expiration = format.parse(token.getExpiration());
+				Date expiration = format.parse(token.getExpiration()); //만료기한
 				UTCTime = subFormat.parse(getTokenbuilder().getTime());
-				expired = expiration.before(UTCTime);
+				expired = expiration.before(UTCTime);	//만료기한이  API서버 시간(UTCTime)보다 이전이면 true, 아니면 false를 반환한다.
 				
 			} catch (LinkhubException le){
 				throw new KakaocertException(le);
@@ -232,9 +256,12 @@ public class KakaocertServiceImp implements KakaocertService{
 	 * @return returned object
 	 * @throws KakaocertException
 	 */
-	protected <T> T httppost(String url, String CorpNum, String PostData,
-			String UserID, Class<T> clazz) throws KakaocertException {
-		return httppost(url, CorpNum, PostData, UserID, null, clazz);
+	protected <T> T httppost(String url, String CorpNum, String PostData,String UserID, Class<T> clazz) throws KakaocertException {
+		/** 
+		 * @NOTE Action이 왜 널인가?
+		 * httppost(String url, String CorpNum, String PostData, String UserID, String Action, Class<T> clazz)
+		 * */
+		return httppost(url, CorpNum, PostData, UserID, null, clazz);	
 	}
 		
 	/**
@@ -248,12 +275,20 @@ public class KakaocertServiceImp implements KakaocertService{
 	 * @return returned object
 	 * @throws KakaocertException
 	 */
-	protected <T> T httppost(String url, String CorpNum, String PostData,
-			String UserID, String Action, Class<T> clazz)
+	protected <T> T httppost(String url, String CorpNum, String PostData, String UserID, String Action, Class<T> clazz)
 			throws KakaocertException {
-		return httppost(url, CorpNum, PostData, UserID, Action, clazz, null);
+		/**
+		 * 두번 wraping할 이유가 있었나?
+		 * httppost(String url, String CorpNum, String PostData, String UserID, String Action, Class<T> clazz, String ContentType)
+		 * */
+		return httppost(url, CorpNum, PostData, UserID, Action, clazz, null);	
 	}	
 
+	/**
+	 * 단방향 암호화
+	 * @param input
+	 * @return
+	 */
 	private static String md5Base64(byte[] input) {
     	MessageDigest md;
     	byte[] btResult = null;
@@ -288,7 +323,22 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
     
 	/**
-	 * 
+	 * API 서버에 url에 해당하는 정보를 요청(post)
+	 * 1. http 커넥션 생성
+	 * 2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당
+	 * 3. 링크허브 연동을 위한 값을 할당
+	 * 	1. x-lh-date : API서버에서 해당 값을 기준으료 유효기간을 확인
+	 * 	2. x-lh-version 
+	 * 	3. contentType 설정( 기본값 : application/json; charset=utf8 )
+	 * 	4. 압축방식 설정 ( "Accept-Encoding" , "gzip")
+	 * 	5. RequestMethod를 post로 설정
+	 *  6. 캐시저장값 미사용처리(setUseCaches(false))
+	 *  7. Post방식 사용을 위한 출력 스트림 사용 가능하도록 지정 (setDoOutput(true))
+	 * 4. PostData에 값이 있을 경우
+	 * 	1. json으로 파싱된 request Object(이하 요청값)의 길이 설정("Content-Length")
+	 * 	2. 요청값을 단방향 암호화하여, http메소드,암호화된 요청값 , 생성시간 , APIversion값을 이용하여 본문 생성(singTarget)
+	 * 	3. 유효성 검을증 위해, hmacsha1(키는 시크릿키며, 데이터는 암호화된 요청값)을 이용하여 서명(Signature)을 생성하여 설정("x-kc-auth")
+	 * 5. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리
 	 * @param url
 	 * @param CorpNum
 	 * @param PostData
@@ -299,50 +349,41 @@ public class KakaocertServiceImp implements KakaocertService{
 	 * @return
 	 * @throws KakaocertException
 	 */
-	protected <T> T httppost(String url, String CorpNum, String PostData,
-			String UserID, String Action, Class<T> clazz, String ContentType)
+	protected <T> T httppost(String url, String CorpNum, String PostData, String UserID, String Action, Class<T> clazz, String ContentType)
 			throws KakaocertException {
-		HttpURLConnection httpURLConnection;
-		try {
-			URL uri = new URL(getServiceURL() + url);
-			httpURLConnection = (HttpURLConnection) uri.openConnection();
-		} catch (Exception e) {
-			throw new KakaocertException(-99999999, "Kakaocert API 서버 접속 실패", e);
-		}
+		//http커넥션 생성
+		HttpURLConnection httpURLConnection = makeHttpUrlConnection(url);
 
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-		format.setTimeZone(TimeZone.getTimeZone("UTC"));
-		String date = format.format(new Date());
+		//현재 시간 획득
+		String date = nowTime();
+
 		
 		if (CorpNum != null && CorpNum.isEmpty() == false) {
-			httpURLConnection.setRequestProperty("Authorization", "Bearer "
-					+ getSessionToken(CorpNum, null));
+			httpURLConnection.setRequestProperty("Authorization", "Bearer "+ getSessionToken(CorpNum, null));
 		}
-
-		httpURLConnection.setRequestProperty("x-lh-date".toLowerCase(),
-				date);
 		
-		httpURLConnection.setRequestProperty("x-lh-version".toLowerCase(),
-				APIVersion);
+		/**
+		 * 링크허브 연동을 위한 인증 기본값 설정
+		 */
 
-		
-		if (ContentType != null && ContentType.isEmpty() == false) {
-			httpURLConnection.setRequestProperty("Content-Type", ContentType);			
-		} else {
-			httpURLConnection.setRequestProperty("Content-Type",
-					"application/json; charset=utf8");			
-		}
+		httpURLConnection.setRequestProperty("x-lh-date".toLowerCase(),date);	//API 서버에서 해당 값을 기준으료 유효기간을 확인한다.
+		httpURLConnection.setRequestProperty("x-lh-version".toLowerCase(),APIVersion);
+
+		//contentType 설정
+		setupContentType(ContentType, httpURLConnection);
 		
 		httpURLConnection.setRequestProperty("Accept-Encoding",	"gzip");
 
-		
 		try {
 			httpURLConnection.setRequestMethod("POST");
 		} catch (ProtocolException e1) {
+			/**
+			 * ne 는 makeHttpUrlConnection서 처리하고 있는데, 추가 처리가 왜 필요한지 모르겠
+			 */
 		}
 
-		httpURLConnection.setUseCaches(false);
-		httpURLConnection.setDoOutput(true);
+		httpURLConnection.setUseCaches(false);	// 캐시저장 값 미사용
+		httpURLConnection.setDoOutput(true);	// Post방식 사용을 위한 출력 스트림 사용 가능하도록 지정
 
 		if ((PostData == null || PostData.isEmpty()) == false) {
 
@@ -355,8 +396,11 @@ public class KakaocertServiceImp implements KakaocertService{
 			signTarget += md5Base64(btPostData)  + "\n";
 			signTarget += date + "\n";
 			signTarget += APIVersion + "\n";
-			
-			String Signature = base64Encode(HMacSha1(base64Decode(getSecretKey()), signTarget.getBytes(Charset.forName("UTF-8"))));
+			//시크릿 키를 암호화
+			//base64 디코딩 > Hmacsha1 암호화(단반향) > base64 인코딩 
+			byte[] base64Decode = base64Decode(getSecretKey());
+			byte[] hMacSha1 = HMacSha1(base64Decode, signTarget.getBytes(Charset.forName("UTF-8")));
+			String Signature = base64Encode(hMacSha1);
 			
 			httpURLConnection.setRequestProperty("x-kc-auth", getLinkID() + " " + Signature);
 			
@@ -382,13 +426,46 @@ public class KakaocertServiceImp implements KakaocertService{
 		}
 		
 		String Result = parseResponse(httpURLConnection);
-
 		return fromJsonString(Result, clazz);		
+	}
+
+	private void setupContentType(String ContentType, HttpURLConnection httpURLConnection) {
+		if (ContentType != null && ContentType.isEmpty() == false) {
+			httpURLConnection.setRequestProperty("Content-Type", ContentType);			
+		} else {
+			httpURLConnection.setRequestProperty("Content-Type",
+					"application/json; charset=utf8");			
+		}
+	}
+
+	private String nowTime() {
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+		format.setTimeZone(TimeZone.getTimeZone("UTC"));
+		String date = format.format(new Date());
+		return date;
+	}
+
+	private HttpURLConnection makeHttpUrlConnection(String url) throws KakaocertException {
+		HttpURLConnection httpURLConnection;
+		try {
+			URL uri = new URL(getServiceURL() + url);
+			httpURLConnection = (HttpURLConnection) uri.openConnection();
+		} catch (Exception e) {
+			throw new KakaocertException(-99999999, "Kakaocert API 서버 접속 실패", e);
+		}
+		return httpURLConnection;
 	}	
 	
 
 	/**
-	 * 
+	 * API 서버에 url에 해당하는 정보를 요청(get)
+	 * 1. http 커넥션 생성
+	 * 2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당
+	 * 3. 링크허브 연동을 위한 값을 할당
+	 * 	1. x-lh-version 
+	 * 	2. 접수아이디 설정( "x-pb-userid" , "receiptID")
+	 * 	3. 압축방식 설정 ( "Accept-Encoding" , "gzip")
+	 * 4. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리
 	 * @param url
 	 * @param CorpNum
 	 * @param UserID
@@ -398,13 +475,7 @@ public class KakaocertServiceImp implements KakaocertService{
 	 */
 	protected <T> T httpget(String url, String CorpNum, String UserID,
 			Class<T> clazz) throws KakaocertException {
-		HttpURLConnection httpURLConnection;
-		try {
-			URL uri = new URL(getServiceURL() + url);
-			httpURLConnection = (HttpURLConnection) uri.openConnection();
-		} catch (Exception e) {
-			throw new KakaocertException(-99999999, "Kakaocert API 서버 접속 실패", e);
-		}
+		HttpURLConnection httpURLConnection = makeHttpUrlConnection(url);
 
 		if (CorpNum != null && CorpNum.isEmpty() == false) {
 			httpURLConnection.setRequestProperty("Authorization", "Bearer "
@@ -460,6 +531,12 @@ public class KakaocertServiceImp implements KakaocertService{
 		public String url;
 	}
 	
+	/**
+	 * 압축되지 않은 스트림을 문자열로 변환
+	 * @param input
+	 * @return
+	 * @throws KakaocertException
+	 */
 	private static String fromStream(InputStream input) throws KakaocertException {
 		InputStreamReader is = null;
 		BufferedReader br = null;
@@ -492,7 +569,12 @@ public class KakaocertServiceImp implements KakaocertService{
 		
 		return sb.toString();
 	}
-	
+	/**
+	 * Gzip으로 압축된 스트림은 압축해제후 문자열로 변환
+	 * @param input
+	 * @return
+	 * @throws KakaocertException
+	 */
 	private static String fromGzipStream(InputStream input) throws KakaocertException {
 		GZIPInputStream zipReader = null;
 		InputStreamReader is = null;		
@@ -528,7 +610,12 @@ public class KakaocertServiceImp implements KakaocertService{
 		return sb.toString();
 	}
 		
-	
+	/**
+	 * 응답 데이터를 처리합니다
+	 * @param httpURLConnection
+	 * @return
+	 * @throws KakaocertException
+	 */
 	private String parseResponse(HttpURLConnection httpURLConnection) throws KakaocertException {
 		
 		String result = "";
@@ -548,7 +635,7 @@ public class KakaocertServiceImp implements KakaocertService{
 			ErrorResponse error = null;
 			
 			try {
-				errorIs = httpURLConnection.getErrorStream();
+				errorIs = httpURLConnection.getErrorStream(); //에러가 발생시, 에러내용을 반환하는 스트림
 				result = fromStream(errorIs);
 				error = fromJsonString(result, ErrorResponse.class);
 			} catch (Exception ignored) { 
@@ -611,7 +698,6 @@ public class KakaocertServiceImp implements KakaocertService{
 		esignRequest.setAppUseYN(appUseYN);
 		
 		String PostData = toJsonString(esignRequest);
-		System.out.println(PostData);
 		ResponseESign response = httppost("/SignToken/Request", ClientCode, PostData, null, ResponseESign.class);
 		
 		return response;
@@ -625,6 +711,7 @@ public class KakaocertServiceImp implements KakaocertService{
 		
 		String PostData = toJsonString(verifyAuthRequest);
 		
+		//API서버에 해당 컨트롤러 호출
 		ReceiptResponse response = httppost("/SignIdentity/Request", ClientCode, PostData, null, ReceiptResponse.class);
 		
 		return response.receiptId;
