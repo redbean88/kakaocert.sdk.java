@@ -2,6 +2,9 @@ package com.kakaocert.api.test;
 
 import static org.junit.Assert.assertNotNull;
 
+import java.io.FileWriter;
+import java.io.PrintWriter;
+
 import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
@@ -12,7 +15,6 @@ import com.kakaocert.api.KakaocertService;
 import com.kakaocert.api.KakaocertServiceImp;
 import com.kakaocert.api.ResponseESign;
 import com.kakaocert.api.VerifyResult;
-import com.kakaocert.api.cms.ResultCMS;
 import com.kakaocert.api.esign.RequestESign;
 import com.kakaocert.api.esign.ResultESign;
 import com.kakaocert.api.test.config.TestConfig;
@@ -53,7 +55,7 @@ public class TEST_ESign {
 			//기본정보
 			request.setCallCenterNum("1600-9999");
 			request.setExpires_in(60);
-			request.setToken("토큰값");
+			request.setToken("서명전문테스트");
 			
 			//수신자정보
 			request.setReceiverBirthDay(TestUserInfo.birth);
@@ -122,13 +124,25 @@ public class TEST_ESign {
 	}
 	
 	@Test
-	public void tset3_verifyESIGN_TEST() throws KakaocertException {
+	public void tset3_verifyESIGN_TEST() throws KakaocertException, Exception {
 		try {
 			VerifyResult result = kakaocertService.verifyESign(TestConfig.ClientCode, receiptID);
-			
+
 			PrettyPrint.setTitleNValue("접수아이디", result.getReceiptId());
 			PrettyPrint.setTitleNValue("전자서명데이터전문", result.getSignedData());
 			PrettyPrint.print();
+			
+		        PrintWriter outputStream = null;
+		 
+		        try {
+		            outputStream = new PrintWriter(new FileWriter("characteroutput.txt"));
+	                outputStream.println(result.getSignedData());
+		        } finally {
+		            if (outputStream != null) {
+		                outputStream.close();
+		            }
+		        }
+			
 			
 		} catch (KakaocertException ke) {
 			System.out.println(ke.getCode());

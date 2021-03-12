@@ -112,13 +112,13 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
 	
 	/**
-	 * 토큰을 가져온다
-	 * 1. 기존 토큰이 없을 경우, 링크아이디, 비밀키, 서비스아이디, 스코프를 정하여 생성(빌터)
-	 * 2. ServiceURL을 설정.
-	 * 		1. KakaoCert 서비스 생성시 설정한 AuthURL이 있는 경우, AuthURL을 ServiceURL로 사용
-	 * 		2. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 Ture인 경우, Auth_GA_URL을 ServiceURL로 사용
-	 * @see	3. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 False인 경우(기본값), ServiceURL을 설정안함
-	 * @see	4. 스코프 값을 추가(310,320,330) 
+	 * <pre>토큰을 획득</pre>
+	 * <pre>1. 기존 토큰이 없을 경우, 링크아이디, 비밀키, 서비스아이디, 스코프를 정하여 생성(빌터)</pre>
+	 * <pre>2. ServiceURL을 설정.</pre>
+	 * <pre>		1. KakaoCert 서비스 생성시 설정한 AuthURL이 있는 경우, AuthURL을 ServiceURL로 사용</pre>
+	 * <pre>		2. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 Ture인 경우, Auth_GA_URL을 ServiceURL로 사용(확인필요)</pre>
+	 * <pre>		3. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 False인 경우(기본값), ServiceURL을 설정안함(확인필요)</pre>
+	 * <pre>		4. 스코프 값을 추가(310,320,330) </pre>
 	 * @return tokenBuilder
 	 */
 	private TokenBuilder getTokenbuilder() {
@@ -146,15 +146,14 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
 	
 	/**
-	 * 세션으로 관리하는 토큰을 가져온다.
-	 * 
-	 * 1. 이용기관 코드(clinentCode)를 확인후 없으면, Exception을 전달 
-	 * 2. tokenTable에 해당 이용기관의 token이 존재시, token에 할당
-	 * 3. token이 존재하면, token 만료기한과 API서버 시간(UTCTime)을 비교하여, API서버 시간(UTCTime)이 만료기한보다 이전이면 true, 아니면 false를 반환
-	 * 4. token이 만료되었다면, tokenTable에 해당 이용기관의 token이 존재시, 해당 이용기관의 token을 제거
-	 * 	1. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 True일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 할당하여 토큰을 생성
-	 * 	2. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 False일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 와일드카드(*)로 할당하여 토큰을 생성
-	 * 	3. 생성된 토큰을 tokenTable에 삽입
+	 * <pre>세션으로 관리하는 토큰을 획득</pre>
+	 * <pre>1. 이용기관 코드(clinentCode)를 확인후 없으면, Exception을 전달 </pre>
+	 * <pre>2. tokenTable에 해당 이용기관의 token이 존재시, token에 할당</pre>
+	 * <pre>3. token이 존재하면, token 만료기한과 API서버 시간(UTCTime)을 비교하여, API서버 시간(UTCTime)이 만료기한보다 이전이면 true, 아니면 false를 반환</pre>
+	 * <pre>4. token이 만료되었다면, tokenTable에 해당 이용기관의 token이 존재시, 해당 이용기관의 token을 제거</pre>
+	 * <pre>	1. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 True일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 할당하여 토큰을 생성</pre>
+	 * <pre>	2. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 False일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 와일드카드(*)로 할당하여 토큰을 생성</pre>
+	 * <pre>	3. 생성된 토큰을 tokenTable에 삽입</pre>
 	 * 
 	 * @param ClientCode
 	 * @param ForwardIP
@@ -323,22 +322,23 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
     
 	/**
-	 * API 서버에 url에 해당하는 정보를 요청(post)
-	 * 1. http 커넥션 생성
-	 * 2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당
-	 * 3. 링크허브 연동을 위한 값을 할당
-	 * 	1. x-lh-date : API서버에서 해당 값을 기준으료 유효기간을 확인
-	 * 	2. x-lh-version 
-	 * 	3. contentType 설정( 기본값 : application/json; charset=utf8 )
-	 * 	4. 압축방식 설정 ( "Accept-Encoding" , "gzip")
-	 * 	5. RequestMethod를 post로 설정
-	 *  6. 캐시저장값 미사용처리(setUseCaches(false))
-	 *  7. Post방식 사용을 위한 출력 스트림 사용 가능하도록 지정 (setDoOutput(true))
-	 * 4. PostData에 값이 있을 경우
-	 * 	1. json으로 파싱된 request Object(이하 요청값)의 길이 설정("Content-Length")
-	 * 	2. 요청값을 단방향 암호화하여, http메소드,암호화된 요청값 , 생성시간 , APIversion값을 이용하여 본문 생성(singTarget)
-	 * 	3. 유효성 검을증 위해, hmacsha1(키는 시크릿키며, 데이터는 암호화된 요청값)을 이용하여 서명(Signature)을 생성하여 설정("x-kc-auth")
-	 * 5. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리
+	 * <pre>API 서버에 url에 해당하는 정보를 요청(post)</pre>
+	 * <pre>1. http 커넥션 생성</pre>
+	 * <pre>2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당</pre>
+	 * <pre>3. 링크허브 연동을 위한 값을 할당</pre>
+	 * <pre>	1. x-lh-date : API서버에서 해당 값을 기준으로 유효기간을 확인</pre>
+	 * <pre>	2. x-lh-version </pre>
+	 * <pre>	3. contentType 설정( 기본값 : application/json; charset=utf8 )</pre>
+	 * <pre>	4. 압축방식 설정 ( "Accept-Encoding" , "gzip")</pre>
+	 * <pre>	5. RequestMethod를 post로 설정</pre>
+	 * <pre> 	6. 캐시저장값 미사용처리(setUseCaches(false))</pre>
+	 * <pre> 	7. Post방식 사용을 위한 출력 스트림 사용 가능하도록 지정 (setDoOutput(true))</pre>
+	 * <pre>4. PostData에 값이 있을 경우</pre>
+	 * <pre>	1. json으로 파싱된 request Object(이하 요청값)의 길이 설정("Content-Length")</pre>
+	 * <pre>	2. 요청값을 단방향 암호화하여, http메소드,암호화된 요청값 , 생성시간 , APIversion값을 이용하여 본문 생성(singTarget)</pre>
+	 * <pre>	3. 유효성 검증을 위해, hmacsha1(키는 시크릿키며, 데이터는 암호화된 요청값)을 이용하여 서명(Signature)을 생성하여 설정("x-kc-auth")</pre>
+	 * <pre>5. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리</pre>
+	 * 
 	 * @param url
 	 * @param CorpNum
 	 * @param PostData
@@ -458,14 +458,14 @@ public class KakaocertServiceImp implements KakaocertService{
 	
 
 	/**
-	 * API 서버에 url에 해당하는 정보를 요청(get)
-	 * 1. http 커넥션 생성
-	 * 2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당
-	 * 3. 링크허브 연동을 위한 값을 할당
-	 * 	1. x-lh-version 
-	 * 	2. 접수아이디 설정( "x-pb-userid" , "receiptID")
-	 * 	3. 압축방식 설정 ( "Accept-Encoding" , "gzip")
-	 * 4. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리
+	 *<pre> API 서버에 url에 해당하는 정보를 요청(get)</pre>
+	 *<pre> 1. http 커넥션 생성</pre>
+	 *<pre> 2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당</pre>
+	 *<pre> 3. 링크허브 연동을 위한 값을 할당</pre>
+	 *<pre> 	1. x-lh-version </pre>
+	 *<pre> 	2. 접수아이디 설정( "x-pb-userid" , "receiptID")</pre>
+	 *<pre> 	3. 압축방식 설정 ( "Accept-Encoding" , "gzip")</pre>
+	 *<pre> 4. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리</pre>
 	 * @param url
 	 * @param CorpNum
 	 * @param UserID
@@ -611,7 +611,7 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
 		
 	/**
-	 * 응답 데이터를 처리합니다
+	 * 응답 데이터를 문자열로 반환
 	 * @param httpURLConnection
 	 * @return
 	 * @throws KakaocertException

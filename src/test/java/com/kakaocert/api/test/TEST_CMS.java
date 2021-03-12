@@ -128,7 +128,6 @@ public class TEST_CMS {
 			
 			PrettyPrint.setTitleNValue("접수아이디",result.getReceiptId());
 			PrettyPrint.setTitleNValue("전자서명데이터전문",result.getSignedData());
-			PrettyPrint.setTitleNValue("전자서명데이터원문",decodeBase64Url.run(result.getSignedData()));
 			PrettyPrint.print();
 						
 		} catch (KakaocertException ke) {
