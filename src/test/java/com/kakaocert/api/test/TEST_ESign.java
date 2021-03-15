@@ -166,6 +166,7 @@ public class TEST_ESign {
 			request.setSubClientID("");
 			request.setTMSTitle("TMS Title");
 			request.setToken("token value");
+			request.isAppUseYN();
 			
 			ResponseESign receiptID = kakaocertService.requestESign(TestConfig.ClientCode, request, true);
 			System.out.println(receiptID.getReceiptId());

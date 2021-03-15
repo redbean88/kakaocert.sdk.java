@@ -16,10 +16,11 @@ public class PrettyPrint {
 	}
 
 
-	static Map<String, String> printMap = new LinkedHashMap<String, String>();
+	final static Map<String, String> printMap = new LinkedHashMap<String, String>();
 	
-	public static void setTitleNValue(String title, String value) {
+	public static PrettyPrint setTitleNValue(String title, String value) {
 		printMap.put(title, value);
+		return prettyPrint;
 	}
 	
 	
