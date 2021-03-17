@@ -73,6 +73,13 @@ public class KakaocertServiceImp implements KakaocertService{
 		return useStaticIP;
 	}
 	
+	/**
+	 * <pre>서비스URL 획득</pre>
+	 * <pre>본 메서드는 통신은 진행할 API서버 도메인 주소를 설정합니다.</pre>
+	 * <pre>1. ServiceURL이 null이 아닐 경우, 할당된 ServiceURL을 반환</pre>
+	 * <pre>2. ServiceURL이 null이고, useStaticIP값이 true인 경우, getServiceURL 메소드는 ServiceURL_GA_REAL를 반환</pre>
+	 * <pre>3. ServiceURL이 null이고, useStaticIP값이 false인 경우, getServiceURL 메소드는 ServiceURL_REAL를 반환</pre>
+	 */
 	public String getServiceURL() {
 		
 		if(ServiceURL != null) return ServiceURL;
@@ -112,16 +119,25 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
 	
 	/**
-	 * <pre>토큰을 획득</pre>
-	 * <pre>1. 기존 토큰이 없을 경우, 링크아이디, 비밀키, 서비스아이디, 스코프를 정하여 생성(빌터)</pre>
-	 * <pre>2. ServiceURL을 설정.</pre>
-	 * <pre>		1. KakaoCert 서비스 생성시 설정한 AuthURL이 있는 경우, AuthURL을 ServiceURL로 사용</pre>
-	 * <pre>		2. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 Ture인 경우, Auth_GA_URL을 ServiceURL로 사용(확인필요)</pre>
-	 * <pre>		3. KakaoCert 서비스 생성시 설정한 AuthURL이 없고, useStaticIP값이 False인 경우(기본값), ServiceURL을 설정안함(확인필요)</pre>
-	 * <pre>		4. 스코프 값을 추가(310,320,330) </pre>
+	 * <pre>토큰빌더 획득</pre>
+	 * <pre>본 메서드는 API서버와의 통신에 이용되는 토큰을 생성하는 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}를 생성합니다.</pre>
+	 * <pre>전역변수로 있는 {@link #tokenBuilder}가 null일 경우, 신규 생성됩니다.</pre>
+	 * <pre>자세한 내용은 아래 내용을 참고해 주세요.</pre>
+	 * <pre>1. 전역 변수 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}가 null일 경우</pre>
+	 * <pre>	1. 링크아이디, 비밀키, 서비스아이디, member 스코프를 추가하여 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}을 생성</pre>
+	 * <pre>		* {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder} 인스턴스 생성시  ServiceURL는 내부적으로 설정된 기본 URL을 할당 ( 기본값 : https://auth.linkhub.co.kr )</pre>
+	 * <pre>	2. ServiceURL을 설정.</pre>
+	 * <pre>		1. KakaoCertService 인스턴스 생성 후, 설정한 {@link #AuthURL}이 null이 아닌 경우, {@link #AuthURL}을 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}의 ServiceURL로 사용</pre>
+	 * <pre>		2. KakaoCertService 인스턴스 생성 후, {@link #AuthURL}이 null이고, useStaticIP값이 true인 경우, Auth_GA_URL을 ServiceURL로 사용</pre>
+	 * <pre>		3. KakaoCertService 인스턴스 생성 후, {@link #AuthURL}이 null이고, useStaticIP값이 false인 경우(기본값), ServiceURL을 설정안함</pre>
+	 * <pre>		4. {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}의 _recentScope변수에 값을 추가(310,320,330) </pre>
+	 * <pre>	3. {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder} 반환</pre>
+	 * <pre>2. 전역 변수 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}가 null이 아닐경우, 기존 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder} 반환</pre>
+	 * 
 	 * @return tokenBuilder
+	 * @throws LinkhubException 
 	 */
-	private TokenBuilder getTokenbuilder() {
+	public TokenBuilder getTokenbuilder() throws LinkhubException {
 		if (this.tokenBuilder == null) {
 			tokenBuilder = TokenBuilder
 					.newInstance(getLinkID(), getSecretKey())
@@ -141,19 +157,23 @@ public class KakaocertServiceImp implements KakaocertService{
 			tokenBuilder.addScope("320");	
 			tokenBuilder.addScope("330");	
 		}
-
 		return tokenBuilder;
 	}
 	
 	/**
-	 * <pre>세션으로 관리하는 토큰을 획득</pre>
-	 * <pre>1. 이용기관 코드(clinentCode)를 확인후 없으면, Exception을 전달 </pre>
-	 * <pre>2. tokenTable에 해당 이용기관의 token이 존재시, token에 할당</pre>
-	 * <pre>3. token이 존재하면, token 만료기한과 API서버 시간(UTCTime)을 비교하여, API서버 시간(UTCTime)이 만료기한보다 이전이면 true, 아니면 false를 반환</pre>
-	 * <pre>4. token이 만료되었다면, tokenTable에 해당 이용기관의 token이 존재시, 해당 이용기관의 token을 제거</pre>
-	 * <pre>	1. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 True일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 할당하여 토큰을 생성</pre>
-	 * <pre>	2. 인증토큰 발급 IP 제한 값(isIPRestrictOnOff)이 False일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 와일드카드(*)로 할당하여 토큰을 생성</pre>
-	 * <pre>	3. 생성된 토큰을 tokenTable에 삽입</pre>
+	 * <pre>토큰 획득</pre>
+	 * <pre>본 메서드는 API서버와 통신에 이용되는 토큰 값을 반환하는 메서드 입니다.</pre>
+	 * <pre>{@link #tokenTable}에 기존 토큰이 있을 경우, 해당 토큰을 반환합니다.</pre>
+	 * <pre>API서버와 토큰의 만료기한을 비교하여,만료 되었을 경우 신규생성을 진행합니다.</pre>
+	 * <pre>자세한 내용은 아래 내용을 참고해 주세요.</pre>
+	 * <pre>1. 이용기관 코드(clinentCode)가 null이거나 문자열의 길이가 0인 경우, {@link com.kakaocert.api.KakaocertException#KakaocertException(long code, String Message) KakaocertException}을 반환("이용기관 코드가 입력되지 않았습니다.")</pre>
+	 * <pre>2. {@link #tokenTable tokenTable}에 해당 이용기관의 {@link kr.co.linkhub.auth.Token token}이 존재시, 지역변수 token(이하 token)에 할당</pre>
+	 * <pre>3. token이 null이 아니면, 만료기한을 확인 
+	 * <pre>	1. token 만료기한과 {@link kr.co.linkhub.auth.TokenBuilder TokenBuilder}의 {@link kr.co.linkhub.auth.TokenBuilder#getTime() getTegetTime}함수를 통해 반환받은 API서버 시간(UTCTime)을 비교하여, API서버 시간(UTCTime)이 만료기한보다 이전이면 true, 아니면 false를 expired 변수에 할당</pre>
+	 * <pre>4. expired 값이 true이고 {@link #tokenTable tokenTable}에 해당 이용기관의 token이 존재하면, 해당 이용기관의 token을 {@link #tokenTable tokenTable}에서 제거</pre>
+	 * <pre>	1. 인증토큰 발급 IP 제한 값({@link #isIPRestrictOnOff isIPRestrictOnOff})이 True일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 할당하여 토큰을 생성</pre>
+	 * <pre>	2. 인증토큰 발급 IP 제한 값({@link #isIPRestrictOnOff isIPRestrictOnOff})이 False일 경우, 이용기관코드(ClientCode - 빌더내부에서는 AccessID로 사용)과 이용가능 IP를 와일드카드(*)로 할당하여 토큰을 생성</pre>
+	 * <pre>	3. 생성된 토큰을{@link #tokenTable tokenTable}에 삽입</pre>
 	 * 
 	 * @param ClientCode
 	 * @param ForwardIP
@@ -284,7 +304,8 @@ public class KakaocertServiceImp implements KakaocertService{
 	}	
 
 	/**
-	 * 단방향 암호화
+	 * 해시값 생성
+	 * 해시값(MD5 알고리즘을 이용)을 구한후, base64 인코딩된 값을 반환
 	 * @param input
 	 * @return
 	 */
@@ -322,22 +343,34 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
     
 	/**
-	 * <pre>API 서버에 url에 해당하는 정보를 요청(post)</pre>
-	 * <pre>1. http 커넥션 생성</pre>
-	 * <pre>2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당</pre>
-	 * <pre>3. 링크허브 연동을 위한 값을 할당</pre>
-	 * <pre>	1. x-lh-date : API서버에서 해당 값을 기준으로 유효기간을 확인</pre>
+	 * <pre>API 서버로 POST 요청</pre>
+	 * <pre>본 메서드는 API서버와 POST 통신을 하는 메서드 입니다</pre>
+	 * <pre>{@link java.net.HttpURLConnection HttpURLConnection} 인스턴스 생성합니다</pre>
+	 * <pre>인증 관련 정보 설정합니다</pre>
+	 * <pre>연동 기본값 설정합니다</pre>
+	 * <pre>요청 데이터 인코딩 및 서명 작업을 진행합니다</pre>
+	 * <pre>결과 데이터 반환합니다</pre>
+	 * <pre>자세한 내용은 아래 내용을 참고해 주세요.</pre>
+	 * <pre>1. request함수에 설정된 url정보를 기반으로 {@link java.net.HttpURLConnection HttpURLConnection} 인스턴스 생성</pre>
+	 * <pre>2. header 부분의 Authorization에 Bearer + 이용기관 코드를 키로 갖는 인증용 토큰({@link #getSessionToken getSessionToken} 메소드의 반환값)을 할당</pre>
+	 * <pre>3. API 서버와 통신을 위한 설정값을 header에 할당</pre>
+	 * <pre>	1. x-lh-date : API서버에서 해당 값을 기준으로 유효기간을 확인(현재 시간)</pre>
 	 * <pre>	2. x-lh-version </pre>
-	 * <pre>	3. contentType 설정( 기본값 : application/json; charset=utf8 )</pre>
-	 * <pre>	4. 압축방식 설정 ( "Accept-Encoding" , "gzip")</pre>
-	 * <pre>	5. RequestMethod를 post로 설정</pre>
+	 * <pre>	3. contentType 할당( 기본값 : application/json; charset=utf8 )</pre>
+	 * <pre>	4. 처리 가능 압축방식 할당( "Accept-Encoding" , "gzip")</pre>	
+	 * <pre>		* 불필요, API 서버는 특정 길이를 넘어가면 gzip 처리를 자동으로 진행, SDK에선 반드시 반환데이터 압축여부를 확인후 처리 필요</pre>	
+	 * <pre>	5. RequestMethod를 POST로 할당</pre>
 	 * <pre> 	6. 캐시저장값 미사용처리(setUseCaches(false))</pre>
-	 * <pre> 	7. Post방식 사용을 위한 출력 스트림 사용 가능하도록 지정 (setDoOutput(true))</pre>
+	 * <pre> 	7. Post방식 사용을 위한 출력 스트림 사용 지정 (setDoOutput(true))</pre>
 	 * <pre>4. PostData에 값이 있을 경우</pre>
-	 * <pre>	1. json으로 파싱된 request Object(이하 요청값)의 길이 설정("Content-Length")</pre>
-	 * <pre>	2. 요청값을 단방향 암호화하여, http메소드,암호화된 요청값 , 생성시간 , APIversion값을 이용하여 본문 생성(singTarget)</pre>
-	 * <pre>	3. 유효성 검증을 위해, hmacsha1(키는 시크릿키며, 데이터는 암호화된 요청값)을 이용하여 서명(Signature)을 생성하여 설정("x-kc-auth")</pre>
-	 * <pre>5. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리</pre>
+	 * <pre>	1. json으로 파싱된 request 데이터(이하 요청값)를 바이트코드로 변환</pre>
+	 * <pre>	2. 요청값의 길이을 header에 할당 ("Content-Length")</pre>
+	 * <pre>	3. http메소드, 인코딩된 요청값 , 생성시간 , APIversion값을 이용하여 본문 생성(singTarget)</pre>
+	 * <pre>		* 인코딩된 요청값 은 요청값의 {@link #md5Base64(byte[]) md5Base64} 함수를 이용하여 생성</pre>
+	 * <pre>	4. 위변조 검증을 위해, {@link #HMacSha1(byte[], byte[]) HMacSha1} 함수를 이용하여 서명(Signature)을 생성 후 header 부분에 할당("x-kc-auth")</pre>
+	 * <pre>		* {@link #HMacSha1(byte[], byte[]) HMacSha1} : 키는 시크릿키며, 데이터는 본문</pre>
+	 * <pre>5. {@link #parseResponse(HttpURLConnection) parseResponse} 메소드를 이용하여 응답을 회신</pre>
+	 * <pre>6. 회신 결과를 {@link #fromJsonString(String, Class) fromJsonString} 함수를 이용 json 데이터를 두번째 argument 타입으로 파싱하여 반환</pre>
 	 * 
 	 * @param url
 	 * @param CorpNum
@@ -372,7 +405,7 @@ public class KakaocertServiceImp implements KakaocertService{
 		//contentType 설정
 		setupContentType(ContentType, httpURLConnection);
 		
-		httpURLConnection.setRequestProperty("Accept-Encoding",	"gzip");
+//		httpURLConnection.setRequestProperty("Accept-Encoding",	"gzip");
 
 		try {
 			httpURLConnection.setRequestMethod("POST");
@@ -438,6 +471,10 @@ public class KakaocertServiceImp implements KakaocertService{
 		}
 	}
 
+	/**
+	 * 클라이언트 시스템시간을 반환
+	 * @return
+	 */
 	private String nowTime() {
 		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 		format.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -458,14 +495,24 @@ public class KakaocertServiceImp implements KakaocertService{
 	
 
 	/**
-	 *<pre> API 서버에 url에 해당하는 정보를 요청(get)</pre>
-	 *<pre> 1. http 커넥션 생성</pre>
-	 *<pre> 2. 이용기관 코드를 키로하는 인증용 토큰을 가져와 Authorization에 할당</pre>
-	 *<pre> 3. 링크허브 연동을 위한 값을 할당</pre>
-	 *<pre> 	1. x-lh-version </pre>
-	 *<pre> 	2. 접수아이디 설정( "x-pb-userid" , "receiptID")</pre>
-	 *<pre> 	3. 압축방식 설정 ( "Accept-Encoding" , "gzip")</pre>
-	 *<pre> 4. 응답을 회신하여 json 데이터를 두번째 arguemnet 타입으로 파싱 처리</pre>
+	 *<pre>API 서버로 GET 요청</pre>
+	 *<pre>본 메서드는 API서버와 GET 통신을 하는 메서드 입니다</pre>
+	 *<pre>{@link java.net.HttpURLConnection HttpURLConnection} 인스턴스 생성합니다</pre>
+	 *<pre>인증 관련 정보 설정합니다</pre>
+	 *<pre>연동 기본값 설정합니다</pre>
+	 *<pre>결과 데이터 반환합니다(압축 데이터의 경우, 압축을 해제하여 반환합니다)</pre>
+	 *<pre>자세한 내용은 아래 내용을 참고해 주세요.</pre>
+	 *<pre>1. request함수에 설정된 url정보를 기반으로 {@link java.net.HttpURLConnection HttpURLConnection} 인스턴스 생성</pre>
+	 *<pre>2. header 부분의 Authorization에 Bearer + 이용기관 코드를 키로하는 인증용 토큰({@link #getSessionToken getSessionToken} 메소드의 반환값)을 할당</pre>
+	 *<pre>3. API 서버와 통신을 위한 설정값을 header에 할당</pre>
+	 *<pre> 	1. x-pb-version</pre>
+	 *<pre> 		1. x-pb-version : POST와 같은 링크허브 버전이 아니고, 팝빌 버전 (확인필요)</pre>
+	 *<pre> 	2. x-pb-userid 접수아이디 할당(  , "receiptID")</pre>
+	 *<pre> 		1. x-pb-userid : 확인필요</pre>
+	 *<pre>		3. 처리 가능 압축방식 할당( "Accept-Encoding" , "gzip")</pre>	
+	 *<pre>4. {@link #parseResponse(HttpURLConnection) parseResponse} 메소드를 이용하여 응답을 회신</pre>
+	 *<pre>5. 회신 결과를 {@link #fromJsonString(String, Class) fromJsonString} 함수를 이용 json 데이터를 두번째 argument 타입으로 파싱하여 반환</pre>
+
 	 * @param url
 	 * @param CorpNum
 	 * @param UserID
@@ -570,7 +617,7 @@ public class KakaocertServiceImp implements KakaocertService{
 		return sb.toString();
 	}
 	/**
-	 * Gzip으로 압축된 스트림은 압축해제후 문자열로 변환
+	 * gzip으로 압축된 스트림을 압축 해제후 문자열로 변환
 	 * @param input
 	 * @return
 	 * @throws KakaocertException
@@ -611,7 +658,15 @@ public class KakaocertServiceImp implements KakaocertService{
 	}
 		
 	/**
-	 * 응답 데이터를 문자열로 반환
+	 * <pre>응답 데이터를 문자열로 반환</pre>
+	 * <pre>본 메서드는 API서버와 통신을 진행하여 반환받은 데이터를 압축유무에 따른 처리를 진행합니다.</pre>
+	 * <pre>1. {@link java.net.HttpURLConnection#getContentEncoding() httpURLConnection.getContentEncoding}메소드를 이용하여, gzip으로 데이터 압축 여부를 확인</pre>
+	 * <pre>	1. 회신 받은 데이터가 gzip으로 압축되어 있을 경우, {@link #fromGzipStream(InputStream) fromGzipStream} 메소드를 이용하여, 데이터를 압축해제하여 문자열로 반환</pre>
+	 * <pre>	2. 회신 받은 데이터가 gzip으로 비압축되어 있을 경우, {@link #fromStream(InputStream) fromStream} 메소드를 이용하여, 데이터를 문자열로 반환</pre>
+	 * <pre>	3. 통신 도중에 에러가 발생시</pre>
+	 * <pre>		1. {@link #fromStream(InputStream) fromStream} 메소드를 이용하여, 에러 결과를 문자열로 반환</pre>
+	 * <pre>		2. {@link #fromJsonString(String, Class)} 메소드를 이용하여, {@link com.kakaocert.api.KakaocertServiceImp.ErrorResponse ErrorResponse} 타입으로 파싱</pre> 
+	 * <pre>		3. {@link com.kakaocert.api.KakaocertException#KakaocertException(long code, String Message) KakaocertException} 반환</pre>
 	 * @param httpURLConnection
 	 * @return
 	 * @throws KakaocertException
@@ -651,11 +706,11 @@ public class KakaocertServiceImp implements KakaocertService{
 				}
 			}
 			
-			if (error == null) {
+			if (error != null) {
+				exception = new KakaocertException(error.getCode(), error.getMessage());
+			} else {
 				exception = new KakaocertException(-99999999,
 						"Fail to receive data from Server.", e);
-			} else {
-				exception = new KakaocertException(error.getCode(), error.getMessage());
 			}
 		} finally {
 			try {
@@ -703,6 +758,13 @@ public class KakaocertServiceImp implements KakaocertService{
 		return response;
 	}
 	
+	/**
+	 * 	<pre>1. 입력 파라미터 검증 (ClientCode , RequestXX )</pre>
+	 * 	<pre>	1. ClientCode , RequestXX 값이 없으면, {@link com.kakaocert.api.KakaocertException#KakaocertException(long code, String Message) KakaocertException} 반환</pre>
+		<pre>2. RequestXX 객체를 Json 타입으로 변환</pre>
+		<pre>3. url, ClientCode, PostData 값과 {@link com.kakaocert.api.KakaocertServiceImp.ReceiptResponse ReceiptResponse} 클래스를 argument로 하여 {@link #httppost(String, String, String, String, String, Class) httppost} 메소드 호출</pre>
+		<pre>4. 반환 받은 {@link com.kakaocert.api.KakaocertServiceImp.ReceiptResponse ReceiptResponse} 값의 receiptId 반환</pre>
+	 */
 	@Override
 	public String requestVerifyAuth(String ClientCode, RequestVerifyAuth verifyAuthRequest) throws KakaocertException {
 		
@@ -710,7 +772,6 @@ public class KakaocertServiceImp implements KakaocertService{
 		if(null == verifyAuthRequest) throw new KakaocertException(-99999999, "본인인증 요청정보가 입력되지 않았습니다.");
 		
 		String PostData = toJsonString(verifyAuthRequest);
-		
 		//API서버에 해당 컨트롤러 호출
 		ReceiptResponse response = httppost("/SignIdentity/Request", ClientCode, PostData, null, ReceiptResponse.class);
 		
@@ -741,6 +802,12 @@ public class KakaocertServiceImp implements KakaocertService{
 				ResultESign.class);
 	}
 	
+	/**
+	 * 	<pre>1. 입력 파라미터 검증 (ClientCode , receiptID )</pre>
+	 * 	<pre>	1. ClientCode , receiptID 값이 없으면, {@link com.kakaocert.api.KakaocertException#KakaocertException(long code, String Message) KakaocertException} 반환</pre>
+		<pre>2. url + receiptID, ClientCode 값과 {@link com.kakaocert.api.verifyauth.ResultVerifyAuth ResultVerifyAuth}클래스를 argument로 하여 {@link #httpget(String, String, String, Class) httpget} 메소드 호출</pre>
+	 * 	<pre>	1. {@link #httpget(String, String, String, Class) httpget} 메소드는 4번째 agument로 파싱된 데이터를 반환 </pre>
+	 */
 	@Override
 	public ResultVerifyAuth getVerifyAuthState(String ClientCode, String receiptID) throws KakaocertException {
 
@@ -781,6 +848,13 @@ public class KakaocertServiceImp implements KakaocertService{
 				VerifyResult.class);
 	}
 
+	/**
+	 * 	<pre>1. 입력 파라미터 검증 (ClientCode , receiptID )</pre>
+	 * 	<pre>	1. ClientCode , receiptID 값이 없으면, {@link com.kakaocert.api.KakaocertException#KakaocertException(long code, String Message) KakaocertException} 반환</pre>
+		<pre>2. url + receiptID, ClientCode 값과 {@link com.kakaocert.api.verifyauth.ResultVerifyAuth ResultVerifyAuth}클래스를 argument로 하여 {@link #httpget(String, String, String, Class) httpget} 메소드 호출</pre>
+	 * 	<pre>	1. {@link #httpget(String, String, String, Class) httpget} 메소드는 4번째 agument로 파싱된 데이터를 반환 </pre>
+	 */
+	
 	@Override
 	public VerifyResult verifyAuth(String ClientCode, String receiptID) throws KakaocertException {
 		if(null == ClientCode || ClientCode.length() == 0 ) throw new KakaocertException(-99999999, "이용기관코드가 입력되지 않았습니다.");

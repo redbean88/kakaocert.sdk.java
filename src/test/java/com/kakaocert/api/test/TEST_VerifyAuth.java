@@ -2,7 +2,9 @@ package com.kakaocert.api.test;
 
 import static org.junit.Assert.assertNotNull;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 import org.junit.Before;
 import org.junit.FixMethodOrder;
@@ -18,6 +20,9 @@ import com.kakaocert.api.test.config.TestUserInfo;
 import com.kakaocert.api.test.util.PrettyPrint;
 import com.kakaocert.api.verifyauth.RequestVerifyAuth;
 import com.kakaocert.api.verifyauth.ResultVerifyAuth;
+
+import kr.co.linkhub.auth.LinkhubException;
+import kr.co.linkhub.auth.TokenBuilder;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TEST_VerifyAuth {
@@ -81,7 +86,7 @@ public class TEST_VerifyAuth {
 		try {
 		
 			while(true) {
-			ResultVerifyAuth result = kakaocertService.getVerifyAuthState(TestConfig.ClientCode, receiptID);
+			ResultVerifyAuth result = kakaocertService.getVerifyAuthState(TestConfig.ClientCode, "123123");
 			
 			int veryfiedFlag = 0;
 			if(result.getState() == 0) {
@@ -157,5 +162,16 @@ public class TEST_VerifyAuth {
 		PrettyPrint.setTitleNValue("서명 검증일시",result.getVerifyDT());
 		PrettyPrint.setTitleNValue("메모",result.getPayload());
 		PrettyPrint.print();
+	}
+	
+	@Test
+	public void test () {
+		KakaocertServiceImp test = new KakaocertServiceImp();
+		try {
+			System.out.println(test.getTokenbuilder().getTime());
+		} catch (LinkhubException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
